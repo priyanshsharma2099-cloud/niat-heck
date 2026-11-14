@@ -1,0 +1,405 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+ * EXECUTIVE B2B SAAS DESIGN SYSTEM (LINEAR / STRIPE STYLE)
+ * ============================================================ */
+:root {
+  --bg-app: #f8fafc;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-hover: #f8fafc;
+  --bg-accent-soft: #f0fdf4;
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #94a3b8;
+
+  --border-default: #e2e8f0;
+  --border-subtle: #f1f5f9;
+
+  --primary: #0f172a;
+  --primary-hover: #1e293b;
+  --primary-tint: #f1f5f9;
+
+  --accent-blue: #2563eb;
+  --accent-blue-hover: #1d4ed8;
+
+  --positive-bg: #f0fdf4;
+  --positive-text: #166534;
+  --positive-border: #bbf7d0;
+
+  --negative-bg: #fff1f2;
+  --negative-text: #9f1239;
+  --negative-border: #fecdd3;
+
+  --radius-card: 8px;
+  --radius-btn: 6px;
+  --radius-pill: 4px;
+
+  --ff-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ff-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--ff-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle, clean scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Full Screen Viewport Frame */
+.viewport-frame {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+/* Clean Sidebar */
+.app-sidebar {
+  width: 210px;
+  min-width: 210px;
+  height: 100vh;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    display: none;
+  }
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  margin-bottom: 14px;
+}
+
+.brand-icon-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: #0f172a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nav-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+}
+
+.nav-item-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+}
+
+.nav-item-btn.is-active {
+  background: var(--bg-subtle);
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* Compact Activity Logs */
+.mini-log-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  font-size: 11px;
+}
+
+.mini-log-card:hover {
+  background: var(--bg-subtle);
+}
+
+.mini-log-card.is-selected {
+  background: var(--bg-subtle);
+  border-color: var(--border-default);
+}
+
+.dot-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #059669;
+  flex-shrink: 0;
+}
+
+.dot-indicator.is-alert {
+  background: #e11d48;
+}
+
+/* Main Screen Stage */
+.stage-main {
+  flex: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Top Navigation Bar */
+.stage-navbar {
+  height: 50px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  flex-shrink: 0;
+}
+
+.segmented-pill-wrap {
+  display: inline-flex;
+  background: var(--bg-subtle);
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+  border: 1px solid var(--border-default);
+}
+
+.segmented-pill-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.segmented-pill-btn.is-active {
+  background: #ffffff;
+  color: var(--text-main);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+/* Content Canvas (Fit to screen with clean scroll) */
+.stage-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Minimal Panels & Cards */
+.minimal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.minimal-card.is-highlighted {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 2px #e2e8f0;
+}
+
+/* Alert Strip */
+.minimal-alert-strip {
+  background: #ffffff;
+  border: 1px solid #fecdd3;
+  border-left: 3px solid #e11d48;
+  border-radius: var(--radius-card);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--text-main);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+}
+
+/* Keyword Chips */
+.kw-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.12s ease;
+}
+
+.kw-pill--pos {
+  background: var(--positive-bg);
+  color: var(--positive-text);
+  border-color: #dcfce7;
+}
+
+.kw-pill--pos:hover, .kw-pill--pos.is-selected {
+  border-color: #86efac;
+  font-weight: 600;
+}
+
+.kw-pill--neg {
+  background: var(--negative-bg);
+  color: var(--negative-text);
+  border-color: #ffe4e6;
+}
+
+.kw-pill--neg:hover, .kw-pill--neg.is-selected {
+  border-color: #fca5a5;
+  font-weight: 600;
+}
+
+/* Quote Callout */
+.minimal-quote-box {
+  background: #fafbfc;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Product Suggestion Cards (Advisory, Non-Checklist) */
+.suggestion-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fafbfc;
+  border: 1px solid var(--border-default);
+  transition: all 0.12s ease;
+}
+
+.suggestion-card:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.suggestion-icon-wrap {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Buttons */
+.btn-primary-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btn-primary-mini:hover {
+  background: #1e293b;
+}
+
+.btn-ghost-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-ghost-mini:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
