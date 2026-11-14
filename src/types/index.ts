@@ -1,130 +1,190 @@
-export type PriceTier = 'budget' | 'mid_tier' | 'luxury';
-export type SentimentLabel = 'positive' | 'neutral' | 'negative';
-export type PriorityLevel = 'critical' | 'medium' | 'low';
-export type AlertSeverity = 'high' | 'medium' | 'info';
-export type ActionCategory =
-  | 'Catalog & Sizing'
-  | 'Quality & Manufacturing'
-  | 'Packaging & Care'
-  | 'Customer Care'
-  | 'Sizing / Catalog'
-  | 'Manufacturing'
-  | 'Packaging'
-  | 'Photography'
-  | 'Customer Support';
-export type ReviewSource = 'Storefront' | 'Marketplace' | 'Direct';
+// ==============================================================================
+// CLUEY CART: CORE TYPESCRIPT DATA CONTRACTS & SCHEMAS
+// ==============================================================================
 
-export interface StorePersona {
+export type StorePlatform = 'Shopify' | 'Meesho' | 'Amazon' | 'Custom';
+export type BrandTone = 'Warm Boutique' | 'Crisp Professional' | 'Friendly Casual';
+export type SentimentType = 'positive' | 'neutral' | 'negative';
+export type TaskPriority = 'high' | 'medium' | 'low';
+export type AlertSeverity = 'critical' | 'warning' | 'info';
+export type ReplyStatus = 'pending' | 'drafted' | 'copied';
+export type ActivityType =
+  | 'import'
+  | 'analyze'
+  | 'alert'
+  | 'draft_reply'
+  | 'copy_reply'
+  | 'task_complete'
+  | 'persona_edit'
+  | 'pdf_export';
+
+/**
+ * 1. Store Persona Model
+ */
+export interface Store {
   id: string;
+  user_id: string;
   name: string;
+  platform: StorePlatform;
   category: string;
   target_demographic: string;
-  price_tier: PriceTier;
-  brand_tone: string;
-  acceptable_variations: string;
+  brand_tone: BrandTone;
+  focus_keywords: string[];
+  ignore_keywords: string[];
   created_at: string;
   updated_at: string;
 }
 
+export type StorePersona = Store;
+export type StorePersonaInput = Omit<Store, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+
+/**
+ * 2. Ingested & Evaluated Customer Review
+ */
 export interface Review {
   id: string;
   store_id: string;
-  source_platform: ReviewSource;
-  external_review_id?: string;
+  batch_id?: string;
+  author: string;
   product_name: string;
-  product_sku?: string;
   rating: number; // 1 to 5
-  review_title?: string;
-  review_text: string;
-  review_date: string;
-  
+  raw_text: string;
+  source_platform: string;
+
   // AI Telemetry
-  is_noise?: boolean;
+  is_noise: boolean;
   noise_reason?: string | null;
-  sentiment_score?: number; // -1.00 to +1.00
-  sentiment_label?: SentimentLabel;
-  primary_attribute?: 'sizing' | 'fabric' | 'stitching' | 'color' | 'value' | 'service';
-  key_phrases?: string[];
-  created_at?: string;
+  sentiment: SentimentType;
+  sentiment_score: number; // -1.0 to +1.0
+  niche_relevance: number; // 0 to 100
+  topics: string[];
+  ai_summary?: string | null;
+  drafted_reply?: string | null;
+  reply_status: ReplyStatus;
+
+  created_at: string;
+  analyzed_at?: string | null;
 }
 
-export interface ActionItem {
+/**
+ * 3. Weekly Action Checklist Task
+ */
+export interface ActionTask {
   id: string;
   store_id: string;
+  batch_id?: string;
   title: string;
-  description: string;
-  category: ActionCategory;
-  priority: PriorityLevel;
-  estimated_impact: string;
-  is_completed: boolean;
+  description?: string;
+  priority: TaskPriority;
+  category: string;
+  impact_estimate?: string;
+  evidence_quote?: string;
+  related_review_ids: string[];
+  completed: boolean;
   completed_at?: string | null;
-  evidence_review_ids?: string[];
   created_at: string;
 }
 
-export interface SentimentAlert {
+export type ActionItem = ActionTask;
+
+/**
+ * 4. Smart Sentiment Trend Spike Alert
+ */
+export interface TrendAlert {
   id: string;
   store_id: string;
-  attribute: string;
+  topic: string;
   severity: AlertSeverity;
-  percentage_surge: number;
-  message: string;
-  is_dismissed: boolean;
+  negative_count: number;
+  delta_percent: number;
+  summary: string;
+  acknowledged: boolean;
   created_at: string;
 }
 
-export interface CustomerReply {
+export type SentimentAlert = TrendAlert;
+
+/**
+ * 5. Real-Time Activity Log
+ */
+export interface ActivityLog {
   id: string;
-  review_id: string;
   store_id: string;
-  drafted_reply: string;
-  tone_applied: string;
-  copied_to_clipboard: boolean;
+  type: ActivityType;
+  message: string;
   created_at: string;
 }
 
+/**
+ * 6. Dashboard Analytics Aggregations
+ */
 export interface DashboardMetrics {
-  netSentimentScore: number;
+  signalKeptPercent: number; // % non-noise
+  positivePercent: number; // % positive among signal
+  noiseFilteredCount: number;
+  openTasksCount: number;
   totalReviews: number;
-  noiseReviewsCount: number;
-  noisePercentage: number;
-  positiveCount: number;
-  neutralCount: number;
-  negativeCount: number;
-  pendingTasksCount: number;
-  criticalAlertsCount: number;
   averageRating: number;
 }
 
-export interface ActivityLog {
-  id: string;
-  timestamp: string;
-  type: 'ingest' | 'filter' | 'task_complete' | 'alert_generated';
-  title: string;
-  description: string;
+export interface DashboardTimelineItem {
+  date: string;
+  positiveSignal: number;
+  negativeSignal: number;
+  filteredNoise: number;
 }
 
-export interface GeminiAnalysisResult {
-  analyzed_reviews: {
-    review_id: string;
-    is_noise: boolean;
-    noise_reason: string | null;
-    sentiment_score: number;
-    sentiment_label: SentimentLabel;
-    primary_attribute: 'sizing' | 'fabric' | 'stitching' | 'color' | 'value' | 'service';
-    key_phrases: string[];
-  }[];
-  action_items: {
-    title: string;
-    description: string;
-    category: ActionCategory;
-    priority: PriorityLevel;
-    estimated_impact: string;
-  }[];
-  sentiment_alerts: {
-    attribute: string;
-    severity: AlertSeverity;
-    percentage_surge: number;
-    message: string;
-  }[];
+export interface KeywordStat {
+  keyword: string;
+  mentions: number;
+  sentiment: 'positive' | 'negative';
+  evidenceQuote: string;
+  author: string;
+  reviewId?: string;
+}
+
+export interface DashboardResponse {
+  store: Store;
+  metrics: DashboardMetrics;
+  timeline: DashboardTimelineItem[];
+  keywordStats: KeywordStat[];
+  activeAlert: TrendAlert | null;
+  recentTasks: ActionTask[];
+  recentActivity: ActivityLog[];
+}
+
+/**
+ * 7. Server-side Gemini AI Structured Outputs
+ */
+export interface GeminiReviewAnalysis {
+  is_noise: boolean;
+  noise_reason: string | null;
+  sentiment: SentimentType;
+  sentiment_score: number;
+  niche_relevance: number;
+  topics: string[];
+  ai_summary: string;
+}
+
+export interface GeminiTaskRecommendation {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  category: string;
+  impact_estimate: string;
+  evidence_quote: string;
+}
+
+export interface GeminiAlertDetection {
+  topic: string;
+  severity: AlertSeverity;
+  negative_count: number;
+  delta_percent: number;
+  summary: string;
+}
+
+export interface GeminiBatchAnalysisResult {
+  analyzed_reviews: (GeminiReviewAnalysis & { review_index: number })[];
+  recommended_tasks: GeminiTaskRecommendation[];
+  detected_alert: GeminiAlertDetection | null;
 }

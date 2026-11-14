@@ -1,89 +1,108 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import confetti from 'canvas-confetti';
 import {
-  StorePersona,
+  Store,
+  StorePersonaInput,
   Review,
-  ActionItem,
-  SentimentAlert,
+  ActionTask,
+  TrendAlert,
   ActivityLog,
   DashboardMetrics,
 } from '../types';
 import {
   INITIAL_STORES,
   INITIAL_REVIEWS,
-  INITIAL_ACTION_ITEMS,
-  INITIAL_SENTIMENT_ALERTS,
+  INITIAL_ACTION_TASKS,
+  INITIAL_TREND_ALERTS,
   INITIAL_ACTIVITY_LOGS,
 } from './mockData';
-import { analyzeReviewsWithGemini } from './geminiService';
-import confetti from 'canvas-confetti';
+import { api } from './api';
+import { exportWeeklyExecutivePdfReport } from './pdfExport';
+
+export type ActiveNavTab = 'overview' | 'reviews' | 'actions' | 'import' | 'persona';
 
 interface StoreContextType {
-  stores: StorePersona[];
-  activeStore: StorePersona;
-  setActiveStore: (store: StorePersona) => void;
-  updateStore: (updated: StorePersona) => void;
-  createStore: (newStore: Omit<StorePersona, 'id' | 'created_at' | 'updated_at'>) => void;
+  stores: Store[];
+  activeStore: Store;
+  setActiveStore: (store: Store) => void;
+  createStore: (input: StorePersonaInput) => Promise<Store>;
+  updateStore: (updates: Partial<Store>) => Promise<Store>;
+  deleteStore: (storeId: string) => Promise<void>;
+
   reviews: Review[];
-  addReviews: (rawReviews: Partial<Review>[], replaceExisting?: boolean) => Promise<void>;
-  actionItems: ActionItem[];
-  toggleActionCompleted: (id: string) => void;
-  addActionItem: (item: Omit<ActionItem, 'id' | 'created_at' | 'store_id'>) => void;
-  sentimentAlerts: SentimentAlert[];
-  dismissAlert: (id: string) => void;
+  addReviews: (rawReviews: Partial<Review>[]) => Promise<void>;
+  simulateBatch: () => Promise<void>;
+  draftReply: (reviewId: string, tone?: string) => Promise<string>;
+  markReplyCopied: (reviewId: string) => Promise<void>;
+
+  tasks: ActionTask[];
+  actionItems: ActionTask[]; // Backwards alias
+  toggleTask: (taskId: string) => Promise<void>;
+  toggleActionCompleted: (taskId: string) => void; // Backwards alias
+  createTask: (input: Partial<ActionTask>) => Promise<void>;
+  addActionItem: (input: Partial<ActionTask>) => void; // Backwards alias
+  deleteTask: (taskId: string) => Promise<void>;
+
+  alerts: TrendAlert[];
+  sentimentAlerts: TrendAlert[]; // Backwards alias
+  dismissAlert: (alertId: string) => Promise<void>;
+
   activityLogs: ActivityLog[];
   metrics: DashboardMetrics;
   isAnalyzing: boolean;
-  activeTab: 'dashboard' | 'checklist' | 'reviews' | 'alerts' | 'persona';
-  setActiveTab: (tab: 'dashboard' | 'checklist' | 'reviews' | 'alerts' | 'persona') => void;
-  reanalyzeAllReviews: () => Promise<void>;
+
+  activeTab: ActiveNavTab;
+  setActiveTab: (tab: ActiveNavTab) => void;
+
+  exportPdf: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Stores State
-  const [stores, setStores] = useState<StorePersona[]>(() => {
+  // 1. Stores
+  const [stores, setStores] = useState<Store[]>(() => {
     const saved = localStorage.getItem('cluey_stores_v2');
     return saved ? JSON.parse(saved) : INITIAL_STORES;
   });
 
   const [activeStoreId, setActiveStoreId] = useState<string>(() => {
     const saved = localStorage.getItem('cluey_active_store_id_v2');
-    return saved || INITIAL_STORES[0]?.id || 'store-apparel';
+    return saved || INITIAL_STORES[0]?.id || 'store-apparel-01';
   });
 
   const activeStore = useMemo(() => {
     return stores.find((s) => s.id === activeStoreId) || stores[0] || INITIAL_STORES[0];
   }, [stores, activeStoreId]);
 
-  // 2. Reviews State
+  // 2. Reviews
   const [reviews, setReviews] = useState<Review[]>(() => {
     const saved = localStorage.getItem('cluey_reviews_v2');
     return saved ? JSON.parse(saved) : INITIAL_REVIEWS;
   });
 
-  // 3. Action Items State
-  const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
-    const saved = localStorage.getItem('cluey_action_items_v2');
-    return saved ? JSON.parse(saved) : INITIAL_ACTION_ITEMS;
+  // 3. Tasks
+  const [tasks, setTasks] = useState<ActionTask[]>(() => {
+    const saved = localStorage.getItem('cluey_tasks_v2');
+    return saved ? JSON.parse(saved) : INITIAL_ACTION_TASKS;
   });
 
-  // 4. Alerts State
-  const [sentimentAlerts, setSentimentAlerts] = useState<SentimentAlert[]>(() => {
-    const saved = localStorage.getItem('cluey_sentiment_alerts_v2');
-    return saved ? JSON.parse(saved) : INITIAL_SENTIMENT_ALERTS;
+  // 4. Alerts
+  const [alerts, setAlerts] = useState<TrendAlert[]>(() => {
+    const saved = localStorage.getItem('cluey_alerts_v2');
+    return saved ? JSON.parse(saved) : INITIAL_TREND_ALERTS;
   });
 
-  // 5. Activity Logs State
+  // 5. Activity Logs
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem('cluey_activity_logs_v2');
+    const saved = localStorage.getItem('cluey_logs_v2');
     return saved ? JSON.parse(saved) : INITIAL_ACTIVITY_LOGS;
   });
 
+  const [activeTab, setActiveTab] = useState<ActiveNavTab>('overview');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'checklist' | 'reviews' | 'alerts' | 'persona'>('dashboard');
 
-  // Persistence Effects
+  // Persistence
   useEffect(() => {
     localStorage.setItem('cluey_stores_v2', JSON.stringify(stores));
   }, [stores]);
@@ -97,265 +116,261 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [reviews]);
 
   useEffect(() => {
-    localStorage.setItem('cluey_action_items_v2', JSON.stringify(actionItems));
-  }, [actionItems]);
+    localStorage.setItem('cluey_tasks_v2', JSON.stringify(tasks));
+  }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem('cluey_sentiment_alerts_v2', JSON.stringify(sentimentAlerts));
-  }, [sentimentAlerts]);
+    localStorage.setItem('cluey_alerts_v2', JSON.stringify(alerts));
+  }, [alerts]);
 
   useEffect(() => {
-    localStorage.setItem('cluey_activity_logs_v2', JSON.stringify(activityLogs));
+    localStorage.setItem('cluey_logs_v2', JSON.stringify(activityLogs));
   }, [activityLogs]);
 
-  // Filter scoped to active store
-  const currentStoreReviews = useMemo(() => {
+  // Sync with Backend API on mount
+  useEffect(() => {
+    let mounted = true;
+    api.getStores().then((fetchedStores) => {
+      if (mounted && Array.isArray(fetchedStores) && fetchedStores.length > 0) {
+        setStores(fetchedStores);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Compute Live Metrics for the Active Store
+  const storeReviews = useMemo(() => {
     return reviews.filter((r) => r.store_id === activeStore.id);
   }, [reviews, activeStore.id]);
 
-  const currentStoreActions = useMemo(() => {
-    return actionItems.filter((a) => a.store_id === activeStore.id);
-  }, [actionItems, activeStore.id]);
+  const storeTasks = useMemo(() => {
+    return tasks.filter((t) => t.store_id === activeStore.id);
+  }, [tasks, activeStore.id]);
 
-  const currentStoreAlerts = useMemo(() => {
-    return sentimentAlerts.filter((al) => al.store_id === activeStore.id && !al.is_dismissed);
-  }, [sentimentAlerts, activeStore.id]);
-
-  // Compute Dashboard Metrics
   const metrics: DashboardMetrics = useMemo(() => {
-    const total = currentStoreReviews.length;
-    if (total === 0) {
-      return {
-        netSentimentScore: 0,
-        totalReviews: 0,
-        noiseReviewsCount: 0,
-        noisePercentage: 0,
-        positiveCount: 0,
-        neutralCount: 0,
-        negativeCount: 0,
-        pendingTasksCount: 0,
-        criticalAlertsCount: 0,
-        averageRating: 0,
-      };
-    }
-
-    const noiseCount = currentStoreReviews.filter((r) => r.is_noise).length;
-    const meaningful = currentStoreReviews.filter((r) => !r.is_noise);
-    const positiveCount = meaningful.filter((r) => r.sentiment_label === 'positive').length;
-    const neutralCount = meaningful.filter((r) => r.sentiment_label === 'neutral').length;
-    const negativeCount = meaningful.filter((r) => r.sentiment_label === 'negative').length;
-
-    const netScore = meaningful.length > 0
-      ? Math.round(((positiveCount - negativeCount) / meaningful.length) * 100)
-      : 0;
-
-    const avgRating = Number(
-      (currentStoreReviews.reduce((acc, r) => acc + (r.rating || 0), 0) / total).toFixed(1)
-    );
-
-    const pendingTasks = currentStoreActions.filter((a) => !a.is_completed).length;
-    const criticalAlerts = currentStoreAlerts.filter((al) => al.severity === 'high').length;
+    const total = storeReviews.length;
+    const noiseCount = storeReviews.filter((r) => r.is_noise).length;
+    const signalReviews = storeReviews.filter((r) => !r.is_noise);
+    const signalPercent = total > 0 ? Math.round((signalReviews.length / total) * 100) : 100;
+    const posReviews = signalReviews.filter((r) => r.sentiment === 'positive');
+    const posPercent = signalReviews.length > 0 ? Math.round((posReviews.length / signalReviews.length) * 100) : 0;
+    const openTasks = storeTasks.filter((t) => !t.completed).length;
+    const avgRating =
+      total > 0 ? Number((storeReviews.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(1)) : 5.0;
 
     return {
-      netSentimentScore: netScore,
+      signalKeptPercent: signalPercent,
+      positivePercent: posPercent,
+      noiseFilteredCount: noiseCount,
+      openTasksCount: openTasks,
       totalReviews: total,
-      noiseReviewsCount: noiseCount,
-      noisePercentage: Math.round((noiseCount / total) * 100),
-      positiveCount,
-      neutralCount,
-      negativeCount,
-      pendingTasksCount: pendingTasks,
-      criticalAlertsCount: criticalAlerts,
       averageRating: avgRating,
     };
-  }, [currentStoreReviews, currentStoreActions, currentStoreAlerts]);
+  }, [storeReviews, storeTasks]);
 
-  // Add and analyze new reviews
-  const addReviews = async (newRawReviews: Partial<Review>[], replaceExisting: boolean = false) => {
+  // Actions
+  const handleSetActiveStore = useCallback((store: Store) => {
+    setActiveStoreId(store.id);
+  }, []);
+
+  const handleCreateStore = async (input: StorePersonaInput): Promise<Store> => {
+    const created = await api.createStore(input);
+    setStores((prev) => [created, ...prev]);
+    setActiveStoreId(created.id);
+    return created;
+  };
+
+  const handleUpdateStore = async (updates: Partial<Store>): Promise<Store> => {
+    const updated = await api.updateStore(activeStore.id, updates);
+    setStores((prev) => prev.map((s) => (s.id === activeStore.id ? updated : s)));
+    return updated;
+  };
+
+  const handleDeleteStore = async (storeId: string): Promise<void> => {
+    await api.deleteStore(storeId);
+    setStores((prev) => prev.filter((s) => s.id !== storeId));
+    if (activeStoreId === storeId) {
+      const remaining = stores.filter((s) => s.id !== storeId);
+      if (remaining.length > 0) setActiveStoreId(remaining[0].id);
+    }
+  };
+
+  const handleAddReviews = async (rawReviews: Partial<Review>[]) => {
     setIsAnalyzing(true);
-    const logId = `log-${Date.now()}`;
-
-    // Add Ingest Log
-    setActivityLogs((prev) => [
-      {
-        id: logId,
-        timestamp: 'Just now',
-        type: 'ingest',
-        title: `Loaded ${newRawReviews.length} Reviews`,
-        description: `Imported customer review dataset for "${activeStore.name}".`,
-      },
-      ...prev,
-    ]);
-
     try {
-      // Execute Review Evaluation
-      const analysis = await analyzeReviewsWithGemini(activeStore, newRawReviews);
-
-      // Merge evaluated telemetry into reviews
-      const evaluatedReviews: Review[] = newRawReviews.map((raw, idx) => {
-        const aiMatch = analysis.analyzed_reviews.find((a) => a.review_id === raw.id) || analysis.analyzed_reviews[idx];
-        return {
-          id: raw.id || `rev-${Date.now()}-${idx}`,
-          store_id: activeStore.id,
-          source_platform: raw.source_platform || 'Storefront',
-          external_review_id: raw.external_review_id,
-          product_name: raw.product_name || 'Core Item',
-          product_sku: raw.product_sku || 'SKU-001',
-          rating: raw.rating || 3,
-          review_title: raw.review_title || 'Customer Feedback',
-          review_text: raw.review_text || '',
-          review_date: raw.review_date || new Date().toISOString(),
-          is_noise: aiMatch?.is_noise ?? false,
-          noise_reason: aiMatch?.noise_reason ?? null,
-          sentiment_score: aiMatch?.sentiment_score ?? 0,
-          sentiment_label: aiMatch?.sentiment_label ?? (raw.rating && raw.rating >= 4 ? 'positive' : raw.rating && raw.rating <= 2 ? 'negative' : 'neutral'),
-          primary_attribute: aiMatch?.primary_attribute ?? 'fabric',
-          key_phrases: aiMatch?.key_phrases ?? [],
-          created_at: new Date().toISOString(),
-        };
-      });
-
-      // Update reviews
-      if (replaceExisting) {
-        setReviews((prev) => [...evaluatedReviews, ...prev.filter((r) => r.store_id !== activeStore.id)]);
-      } else {
-        setReviews((prev) => [...evaluatedReviews, ...prev]);
+      const result = await api.analyzeReviews(activeStore.id, rawReviews);
+      if (result.reviews) {
+        setReviews((prev) => [...result.reviews, ...prev]);
+      }
+      if (result.tasks && result.tasks.length > 0) {
+        setTasks((prev) => [...result.tasks, ...prev]);
+      }
+      if (result.alert) {
+        setAlerts((prev) => [result.alert, ...prev]);
       }
 
-      // Add newly synthesized action items
-      if (analysis.action_items && analysis.action_items.length > 0) {
-        const newActions: ActionItem[] = analysis.action_items.map((act, i) => ({
-          id: `act-${Date.now()}-${i}`,
-          store_id: activeStore.id,
-          title: act.title,
-          description: act.description,
-          category: act.category,
-          priority: act.priority,
-          estimated_impact: act.estimated_impact,
-          is_completed: false,
-          completed_at: null,
-          evidence_review_ids: evaluatedReviews.map((r) => r.id).slice(0, 2),
-          created_at: new Date().toISOString(),
-        }));
-
-        if (replaceExisting) {
-          setActionItems((prev) => [...newActions, ...prev.filter((a) => a.store_id !== activeStore.id)]);
-        } else {
-          setActionItems((prev) => [...newActions, ...prev]);
-        }
-      }
-
-      // Add newly detected alerts
-      if (analysis.sentiment_alerts && analysis.sentiment_alerts.length > 0) {
-        const newAlerts: SentimentAlert[] = analysis.sentiment_alerts.map((alt, i) => ({
-          id: `alt-${Date.now()}-${i}`,
-          store_id: activeStore.id,
-          attribute: alt.attribute,
-          severity: alt.severity,
-          percentage_surge: alt.percentage_surge,
-          message: alt.message,
-          is_dismissed: false,
-          created_at: new Date().toISOString(),
-        }));
-
-        if (replaceExisting) {
-          setSentimentAlerts((prev) => [...newAlerts, ...prev.filter((al) => al.store_id !== activeStore.id)]);
-        } else {
-          setSentimentAlerts((prev) => [...newAlerts, ...prev]);
-        }
-      } else if (replaceExisting) {
-        setSentimentAlerts((prev) => prev.filter((al) => al.store_id !== activeStore.id));
-      }
-
-      // Add Completion Log
-      const noiseFiltered = evaluatedReviews.filter((r) => r.is_noise).length;
       setActivityLogs((prev) => [
         {
-          id: `log-done-${Date.now()}`,
-          timestamp: 'Just now',
-          type: 'filter',
-          title: `${evaluatedReviews.length} Reviews Analyzed`,
-          description: `Processed ${evaluatedReviews.length} customer reviews. Filtered ${noiseFiltered} courier delivery complaints.`,
+          id: `act-${Date.now()}`,
+          store_id: activeStore.id,
+          type: 'analyze',
+          message: `Ingested & analyzed ${rawReviews.length} customer feedback items`,
+          created_at: new Date().toISOString(),
         },
         ...prev,
       ]);
-    } catch (err) {
-      console.error('Error in addReviews:', err);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // Re-run full analysis across current store's reviews
-  const reanalyzeAllReviews = async () => {
-    if (currentStoreReviews.length === 0) return;
-    await addReviews(currentStoreReviews);
+  const handleSimulateBatch = async () => {
+    setIsAnalyzing(true);
+    try {
+      const result = await api.simulateReviews(activeStore.id);
+      if (result.reviews) {
+        setReviews((prev) => [...result.reviews, ...prev]);
+      }
+      if (result.tasks && result.tasks.length > 0) {
+        setTasks((prev) => [...result.tasks, ...prev]);
+      }
+      if (result.alert) {
+        setAlerts((prev) => [result.alert, ...prev]);
+      }
+
+      setActivityLogs((prev) => [
+        {
+          id: `act-${Date.now()}`,
+          store_id: activeStore.id,
+          type: 'analyze',
+          message: 'Simulated 6 persona-matched reviews (praise, courier noise, defect cluster)',
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  // Toggle action item completion status
-  const toggleActionCompleted = (id: string) => {
-    setActionItems((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextState = !item.is_completed;
-          if (nextState) {
-            // Trigger gentle celebratory confetti
-            confetti({
-              particleCount: 40,
-              spread: 60,
-              origin: { y: 0.8 },
-            });
-            setActivityLogs((logs) => [
-              {
-                id: `log-act-${Date.now()}`,
-                timestamp: 'Just now',
-                type: 'task_complete',
-                title: 'Operational Task Completed',
-                description: `"${item.title.slice(0, 40)}..." marked resolved.`,
-              },
-              ...logs,
-            ]);
-          }
-          return {
-            ...item,
-            is_completed: nextState,
-            completed_at: nextState ? new Date().toISOString() : null,
-          };
-        }
-        return item;
-      })
+  const handleDraftReply = async (reviewId: string, tone?: string): Promise<string> => {
+    const result = await api.draftReply(activeStore.id, reviewId, tone);
+    const draftText = result.drafted_reply || '';
+
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.id === reviewId ? { ...r, drafted_reply: draftText, reply_status: 'drafted' } : r
+      )
     );
+
+    setActivityLogs((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        store_id: activeStore.id,
+        type: 'draft_reply',
+        message: `Drafted brand reply with tone: ${tone || activeStore.brand_tone}`,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+
+    return draftText;
   };
 
-  const addActionItem = (item: Omit<ActionItem, 'id' | 'created_at' | 'store_id'>) => {
-    const newItem: ActionItem = {
-      ...item,
-      id: `act-manual-${Date.now()}`,
-      store_id: activeStore.id,
-      created_at: new Date().toISOString(),
-    };
-    setActionItems((prev) => [newItem, ...prev]);
-  };
-
-  const dismissAlert = (id: string) => {
-    setSentimentAlerts((prev) =>
-      prev.map((al) => (al.id === id ? { ...al, is_dismissed: true } : al))
+  const handleMarkReplyCopied = async (reviewId: string) => {
+    await api.markReplyCopied(activeStore.id, reviewId);
+    setReviews((prev) =>
+      prev.map((r) => (r.id === reviewId ? { ...r, reply_status: 'copied' } : r))
     );
+
+    setActivityLogs((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        store_id: activeStore.id,
+        type: 'copy_reply',
+        message: 'Customer reply copied to clipboard for storefront posting',
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
   };
 
-  const updateStore = (updated: StorePersona) => {
-    setStores((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const newCompleted = !task.completed;
+    await api.updateTask(activeStore.id, taskId, { completed: newCompleted });
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              completed: newCompleted,
+              completed_at: newCompleted ? new Date().toISOString() : null,
+            }
+          : t
+      )
+    );
+
+    if (newCompleted) {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.8 },
+      });
+
+      setActivityLogs((prev) => [
+        {
+          id: `act-${Date.now()}`,
+          store_id: activeStore.id,
+          type: 'task_complete',
+          message: `Completed weekly action: "${task.title}"`,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    }
   };
 
-  const createStore = (newStoreData: Omit<StorePersona, 'id' | 'created_at' | 'updated_at'>) => {
-    const newStore: StorePersona = {
-      ...newStoreData,
-      id: `store-${Date.now()}`,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setStores((prev) => [...prev, newStore]);
-    setActiveStoreId(newStore.id);
+  const handleCreateTask = async (input: Partial<ActionTask>) => {
+    const created = await api.createTask(activeStore.id, input);
+    setTasks((prev) => [created, ...prev]);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    await api.deleteTask(activeStore.id, taskId);
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+  };
+
+  const handleDismissAlert = async (alertId: string) => {
+    await api.acknowledgeAlert(activeStore.id, alertId);
+    setAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, acknowledged: true } : a)));
+  };
+
+  const handleExportPdf = () => {
+    exportWeeklyExecutivePdfReport(
+      activeStore,
+      storeReviews,
+      storeTasks,
+      alerts.filter((a) => a.store_id === activeStore.id),
+      metrics
+    );
+    api.logReportExport(activeStore.id);
+
+    setActivityLogs((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        store_id: activeStore.id,
+        type: 'pdf_export',
+        message: 'Exported Weekly Executive Feedback & Action PDF Report',
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
   };
 
   return (
@@ -363,22 +378,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         stores,
         activeStore,
-        setActiveStore: (s) => setActiveStoreId(s.id),
-        updateStore,
-        createStore,
-        reviews: currentStoreReviews,
-        addReviews,
-        actionItems: currentStoreActions,
-        toggleActionCompleted,
-        addActionItem,
-        sentimentAlerts: currentStoreAlerts,
-        dismissAlert,
+        setActiveStore: handleSetActiveStore,
+        createStore: handleCreateStore,
+        updateStore: handleUpdateStore,
+        deleteStore: handleDeleteStore,
+
+        reviews,
+        addReviews: handleAddReviews,
+        simulateBatch: handleSimulateBatch,
+        draftReply: handleDraftReply,
+        markReplyCopied: handleMarkReplyCopied,
+
+        tasks,
+        actionItems: tasks,
+        toggleTask: handleToggleTask,
+        toggleActionCompleted: handleToggleTask,
+        createTask: handleCreateTask,
+        addActionItem: handleCreateTask,
+        deleteTask: handleDeleteTask,
+
+        alerts,
+        sentimentAlerts: alerts,
+        dismissAlert: handleDismissAlert,
+
         activityLogs,
         metrics,
         isAnalyzing,
+
         activeTab,
         setActiveTab,
-        reanalyzeAllReviews,
+
+        exportPdf: handleExportPdf,
       }}
     >
       {children}

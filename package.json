@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^3.3.0",
     "@google/generative-ai": "^0.21.0",
     "@react-oauth/google": "^0.13.5",
     "@supabase/supabase-js": "^2.46.1",

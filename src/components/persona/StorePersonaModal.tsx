@@ -1,236 +1,193 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../lib/storeContext';
-import { StorePersona, PriceTier } from '../../types';
-import {
-  X,
-  Store,
-  Sparkles,
-  Save,
-  Check,
-} from 'lucide-react';
+import { StorePlatform, BrandTone } from '../../types';
+import { X, Store as StoreIcon, Sparkles } from 'lucide-react';
 
 interface StorePersonaModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isCreatingNew?: boolean;
 }
 
 export const StorePersonaModal: React.FC<StorePersonaModalProps> = ({
   isOpen,
   onClose,
-  isCreatingNew = false,
 }) => {
-  const { activeStore, updateStore, createStore } = useStore();
+  const { createStore } = useStore();
 
-  const [name, setName] = useState(activeStore.name);
-  const [category, setCategory] = useState(activeStore.category);
-  const [demographic, setDemographic] = useState(activeStore.target_demographic);
-  const [priceTier, setPriceTier] = useState<PriceTier>(activeStore.price_tier);
-  const [brandTone, setBrandTone] = useState(activeStore.brand_tone);
-  const [tolerances, setTolerances] = useState(activeStore.acceptable_variations);
-  const [isSaved, setIsSaved] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      if (isCreatingNew) {
-        setName('');
-        setCategory('Sustainable Fashion');
-        setDemographic('Eco-conscious professionals 25-40');
-        setPriceTier('mid_tier');
-        setBrandTone('Artisanal, conscious, and resolution-driven');
-        setTolerances('Organic cotton natural slubs and unbleached fiber flecks');
-      } else {
-        setName(activeStore.name);
-        setCategory(activeStore.category);
-        setDemographic(activeStore.target_demographic);
-        setPriceTier(activeStore.price_tier);
-        setBrandTone(activeStore.brand_tone);
-        setTolerances(activeStore.acceptable_variations);
-      }
-      setIsSaved(false);
-    }
-  }, [isOpen, activeStore, isCreatingNew]);
+  const [name, setName] = useState('');
+  const [platform, setPlatform] = useState<StorePlatform>('Shopify');
+  const [category, setCategory] = useState('');
+  const [targetDemographic, setTargetDemographic] = useState('');
+  const [brandTone, setBrandTone] = useState<BrandTone>('Warm Boutique');
+  const [focusTagString, setFocusTagString] = useState('handloom, pure linen, breathable, drape');
+  const [ignoreTagString, setIgnoreTagString] = useState('courier delayed, delivery boy, parcel thrown');
+  const [isCreating, setIsCreating] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !category.trim()) return;
 
-    if (isCreatingNew) {
-      createStore({
-        name: name.trim(),
-        category: category.trim(),
-        target_demographic: demographic.trim(),
-        price_tier: priceTier,
-        brand_tone: brandTone.trim(),
-        acceptable_variations: tolerances.trim(),
-      });
-    } else {
-      updateStore({
-        ...activeStore,
-        name: name.trim(),
-        category: category.trim(),
-        target_demographic: demographic.trim(),
-        price_tier: priceTier,
-        brand_tone: brandTone.trim(),
-        acceptable_variations: tolerances.trim(),
-        updated_at: new Date().toISOString(),
-      });
-    }
+    setIsCreating(true);
+    try {
+      const focus_keywords = focusTagString
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const ignore_keywords = ignoreTagString
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-    setIsSaved(true);
-    setTimeout(() => {
-      setIsSaved(false);
+      await createStore({
+        name: name.trim(),
+        platform,
+        category: category.trim(),
+        target_demographic: targetDemographic.trim() || 'Discerning online shoppers',
+        brand_tone: brandTone,
+        focus_keywords,
+        ignore_keywords,
+      });
+
+      setName('');
+      setCategory('');
       onClose();
-    }, 800);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[32px] border border-slate-200/90 shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Store className="w-5 h-5 text-indigo-600" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-[28px] border border-[#18181B14] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="p-5 border-b border-zinc-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-[12px] bg-[#18181B] text-white flex items-center justify-center">
+              <StoreIcon className="w-4 h-4 text-[#3B5BDB]" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">
-                {isCreatingNew ? 'Create New Store Persona' : 'Calibrate Store Persona Profile'}
+              <h3 className="text-sm font-bold text-zinc-900 font-plus-jakarta">
+                Add New Store Persona
               </h3>
-              <p className="text-xs text-slate-400">
-                Customizes Gemini's noise-filtering rules and operational priorities
+              <p className="text-[10px] text-zinc-400">
+                Setup custom noise filtering and brand tone for this storefront
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Storefront Name
-              </label>
+              <label className="block font-semibold text-zinc-800 mb-1">Store Name *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Aura Linen Atelier"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Aura Ethnic Wear"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-semibold"
+                className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none focus:border-zinc-400 font-sans"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Product Category / Niche
-              </label>
-              <input
-                type="text"
-                required
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g. Ethnic Wear & Handloom"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
-              />
+              <label className="block font-semibold text-zinc-800 mb-1">Platform</label>
+              <select
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value as StorePlatform)}
+                className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none font-sans"
+              >
+                <option value="Shopify">Shopify</option>
+                <option value="Meesho">Meesho</option>
+                <option value="Amazon">Amazon</option>
+                <option value="Custom">Custom Marketplace</option>
+              </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Target Demographic
-              </label>
+              <label className="block font-semibold text-zinc-800 mb-1">Product Category *</label>
               <input
                 type="text"
                 required
-                value={demographic}
-                onChange={(e) => setDemographic(e.target.value)}
-                placeholder="e.g. Women 25-45, Festive Shoppers"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
+                placeholder="e.g. Handloom Apparel"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none focus:border-zinc-400 font-sans"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Price Tier
-              </label>
+              <label className="block font-semibold text-zinc-800 mb-1">Brand Voice</label>
               <select
-                value={priceTier}
-                onChange={(e) => setPriceTier(e.target.value as PriceTier)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
+                value={brandTone}
+                onChange={(e) => setBrandTone(e.target.value as BrandTone)}
+                className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none font-sans"
               >
-                <option value="budget">Budget / Value</option>
-                <option value="mid_tier">Mid-Tier Boutique</option>
-                <option value="luxury">High-End Luxury</option>
+                <option value="Warm Boutique">Warm Boutique</option>
+                <option value="Crisp Professional">Crisp Professional</option>
+                <option value="Friendly Casual">Friendly Casual</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-700 font-bold mb-1">
-              Brand Tone (Voice for AI Replies)
-            </label>
+            <label className="block font-semibold text-zinc-800 mb-1">Target Demographic</label>
             <input
               type="text"
-              required
-              value={brandTone}
-              onChange={(e) => setBrandTone(e.target.value)}
-              placeholder="e.g. Humble, empathetic, warm, and resolution-oriented"
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
+              placeholder="e.g. Discerning women 28-45 looking for comfortable summer pieces"
+              value={targetDemographic}
+              onChange={(e) => setTargetDemographic(e.target.value)}
+              className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none focus:border-zinc-400 font-sans"
             />
           </div>
 
           <div>
-            <label className="block text-slate-700 font-bold mb-1">
-              Acceptable Tolerances / Natural Artisanal Variations
+            <label className="block font-semibold text-zinc-800 mb-1">
+              Focus Craftsmanship Keywords (comma separated)
             </label>
-            <textarea
-              rows={2}
-              value={tolerances}
-              onChange={(e) => setTolerances(e.target.value)}
-              placeholder="e.g. Handloom weave slubs; natural vegetable indigo dye scent; slight block print misalignments"
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs leading-relaxed"
+            <input
+              type="text"
+              value={focusTagString}
+              onChange={(e) => setFocusTagString(e.target.value)}
+              className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none font-sans"
             />
-            <p className="text-[10px] text-slate-400 mt-1">
-              Gemini will not flag these acceptable variations as manufacturing defects.
-            </p>
           </div>
 
-          {/* Footer */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            <label className="block font-semibold text-zinc-800 mb-1">
+              Noise Ignore Keywords (comma separated)
+            </label>
+            <input
+              type="text"
+              value={ignoreTagString}
+              onChange={(e) => setIgnoreTagString(e.target.value)}
+              className="w-full p-2.5 rounded-[12px] bg-[#F8F8F5] border border-zinc-200 focus:outline-none font-sans"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold transition-colors"
+              className="px-4 py-2 rounded-[12px] bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 text-white transition-all shadow-sm ${
-                isSaved ? 'bg-emerald-600' : 'bg-slate-900 hover:bg-slate-800 active:scale-95'
-              }`}
+              disabled={isCreating}
+              className="px-4 py-2 rounded-[12px] bg-[#18181B] hover:bg-black text-white font-semibold transition-colors disabled:opacity-50"
             >
-              {isSaved ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Persona Saved!</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>{isCreatingNew ? 'Create Store Profile' : 'Save Calibration'}</span>
-                </>
-              )}
+              {isCreating ? 'Creating...' : 'Create & Switch Store'}
             </button>
           </div>
         </form>
